@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Portfolio</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+tailwind.config = { theme: { extend: {
+  colors: { ink:'#0a0a0f', panel:'#111118', line:'#1f1f2b', muted:'#8b8ba7', accent:'#7c5cff', accent2:'#22d3ee' }
+}}}
+</script>
+<style>
+  html { scroll-behavior: smooth; }
+  body { color:#e6e6f0; background:#0a0a0f; }
+  .glass { background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.06); backdrop-filter: blur(10px); }
+  .gradient-text { background: linear-gradient(90deg,#fff 0%, #c9c2ff 50%, #88e6ff 100%); -webkit-background-clip:text; color: transparent; }
+  .modal-backdrop { position:fixed; inset:0; background: rgba(0,0,0,.7); display:flex; align-items:center; justify-content:center; z-index:200; backdrop-filter: blur(6px); }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body class="font-sans antialiased">
+
+<header class="sticky top-0 z-50 backdrop-blur-md bg-ink/70 border-b border-line/60">
+  <nav class="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+    <span id="brandName" class="font-semibold">Portfolio</span>
+    <button id="lockBtn" class="text-xs px-3 py-1.5 rounded-md border border-line text-muted hover:text-white">Admin Login</button>
+  </nav>
+</header>
+
+<main class="max-w-6xl mx-auto px-6 py-20">
+  <section id="top" class="mb-20">
+    <h1 id="heroHeadline" class="text-4xl md:text-6xl font-extrabold gradient-text">Loading...</h1>
+    <p id="heroBio" class="mt-6 text-lg text-muted">Please wait while we sync your data...</p>
+  </section>
+
+  <section id="about" class="py-10 border-t border-line/60" data-section="about"><h2 class="text-2xl font-bold mb-4">ABOUT ME</h2><div id="about-content" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div></section>
+  <section id="projects" class="py-10 border-t border-line/60" data-section="projects"><h2 class="text-2xl font-bold mb-4">PROJECTS</h2><div id="projects-content" class="grid grid-cols-1 md:grid-cols-3 gap-4"></div></section>
+  <section id="contact" class="py-10 border-t border-line/60" data-section="contact"><h2 class="text-2xl font-bold mb-4">CONTACT</h2><div id="contact-content" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div></section>
+</main>
+
+<script>
+/* 1. CLOUD DATABASE CONFIGURATION */
+const SUPABASE_URL = "https://eaaavmyeqrrdyftzulbk.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVhYWF2bXllcXJyZHlmdHp1bGJrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxMjY5NDgsImV4cCI6MjA5NzcwMjk0OH0.Db9kj3_jL6l81_SeI7WakAJs1AercwtxIOPsufIcXcE";
+
+const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const SECRET_HASH = "240d1dfb47e2b834e56598c2ca893b8f192b347b7a695b28da35cd58db31b349";
+
+let state = { items: [], editMode: false };
+
+/* 2. SYNC ENGINE */
+async function syncFromCloud() {
+  try {
+    const { data: profile } = await supabase.from('profile_data').select('*').eq('id', 'main_user').single();
+    if (profile) {
+      document.querySelector('#brandName').textContent = profile.name;
+      document.querySelector('#heroHeadline').textContent = profile.headline;
+      document.querySelector('#heroBio').textContent = profile.bio;
+    }
+    const { data: items } = await supabase.from('portfolio_items').select('*');
+    if (items) { state.items = items; render(); }
+  } catch (err) { console.error("Sync error:", err); }
+}
+
+/* 3. RENDER ENGINE */
+function render() {
+  ['about', 'projects', 'contact'].forEach(sec => {
+    const container = document.querySelector(`#${sec}-content`);
+    const items = state.items.filter(i => i.section === sec);
+    container.innerHTML = items.map(i => `
+      <div class="glass p-5 rounded-xl">
+        <h3 class="font-bold text-lg">${i.title}</h3>
+        <p class="text-sm text-muted mt-2">${i.body}</p>
+      </div>
+    `).join('');
+  });
+}
+
+/* 4. ADMIN LOCK */
+document.querySelector('#lockBtn').addEventListener('click', async () => {
+  const pass = prompt("Enter Password:");
+  if (!pass) return;
+  const buffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pass));
+  const hash = Array.from(new Uint8Array(buffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+  if (hash === SECRET_HASH) { 
+    state.editMode = true; 
+    alert("Admin Mode Enabled. Changes will sync to cloud."); 
+  } else { 
+    alert("Incorrect Password"); 
+  }
+});
+
+syncFromCloud();
+</script>
+</body>
+</html>
